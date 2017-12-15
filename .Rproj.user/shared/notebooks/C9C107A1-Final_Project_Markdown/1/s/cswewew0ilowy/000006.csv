@@ -1,0 +1,4 @@
+"0","mapCountryData(matched, nameColumnToPlot=""Freq"", mapRegion = ""Africa"", mapTitle=""Number of Projects"", catMethod = ""pretty"", colourPalette = ""heat"")
+"
+"2","You asked for 7 categories, 10 were used due to pretty() classification
+"

@@ -1,0 +1,270 @@
+---
+title: "Final Project"
+author: "Beata Cichocka"
+date: "November 28, 2017"
+output:
+  html_document: default
+  pdf_document: default
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(quanteda)
+library(tidyverse)
+library(readxl)
+library(DBI)
+library(RMySQL) 
+library(httr)
+library(jsonlite)
+library(haven)
+library(RColorBrewer)
+library(readxl)
+library(rworldmap)
+library(maps)
+library(plotly)
+library(dplyr)
+
+## Tidying Chinese Aid Data: 2000-2014
+getwd()
+
+china.aid <- read_excel("~/HertieDataScience/Final_Project/ChinaAid.xlsx")
+
+## Tidying GDP Growth Data: GDP per Capita in USD: 2000-2014
+
+global.gdp <- read.csv(file = "~/HertieDataScience/Final_Project/GDPdata.csv", header = TRUE, sep = ",") %>%  filter(Year %in% c(2000:2014)) %>% select(-Item) %>%  arrange(Country.or.Area, Year) %>% rename(GDP_USD = Value) %>%  mutate(Growth_Rate= log10(GDP_USD)) %>% rename(year= Year, recipient_condensed = Country.or.Area)
+
+
+#joining gdp and aid
+
+joined <- full_join(china.aid, global.gdp)
+
+
+## Tidying Trade Data: China's exports and imports by country, 2000-2014
+
+trade1 <- read.csv(file="~/HertieDataScience/Final_Project/comtrade2000_2004.csv")
+trade2 <- read.csv(file="~/HertieDataScience/Final_Project/comtrade2005_2009.csv")
+trade3 <- read.csv(file="~/HertieDataScience/Final_Project/comtrade2010_2014.csv")
+tmp <- full_join(trade1, trade2)
+
+china.trade <- full_join(tmp, trade3) %>%  select(Year, Partner, Trade.Flow, Trade.Value..US..) %>%  arrange(Partner, Year) %>%  spread(Trade.Flow, Trade.Value..US..)%>% mutate_all(funs(replace(., is.na(.), 0)))
+
+```
+
+
+
+## Wordcloud of Descriptions of Chinese Aid
+```{r, echo=FALSE, warning=FALSE}
+commonwords <- c("china", "Chinese", "china's", "project",
+                 "signed","agreement",
+                 "million", "billion", "one", "two", "worth","used",
+                 "also", "years", "year", "month", 
+                 stopwords("english"), month.name)
+
+myDfm <- quanteda::dfm(corpus(china.aid, text_field = "description"),
+                       remove = commonwords,
+                       remove_punct = TRUE,  
+                       remove_numbers =TRUE
+                       ) 
+
+wordcloud <- quanteda::textplot_wordcloud(myDfm,
+                             min.freq = 500,
+                             random.order = FALSE, 
+                             rot.per = .25, 
+                             colors = RColorBrewer::brewer.pal(8,"Dark2")) 
+wordcloud
+```
+
+
+## Map of Recipient Countries: Amount of Projects
+```{r, arning=FALSE, echo=FALSE}
+
+countries.data <- as.data.frame(table(china.aid$recipient_condensed))
+
+matched <- joinCountryData2Map(countries.data, joinCode="NAME", nameJoinColumn="Var1", verbose=FALSE)
+
+mapCountryData(matched, nameColumnToPlot="Freq", mapTitle="Number of Projects",catMethod = "pretty", colourPalette = "heat")
+
+```
+
+## Map of Africa
+```{r, warning=FALSE, echo=FALSE}
+countries.data <- as.data.frame(table(china.aid$recipient_condensed))
+
+matched <- joinCountryData2Map(countries.data, joinCode="NAME", nameJoinColumn="Var1", verbose=FALSE)
+
+mapCountryData(matched, nameColumnToPlot="Freq", mapRegion = "Africa", mapTitle="Number of Projects", catMethod = "pretty", colourPalette = "heat")
+
+```
+
+
+###Aid by Sectors Over Time
+```{r}
+
+selected_sectors<- as.data.frame(table(china.aid$crs_sector_name)) %>% filter(Freq >100) %>% distinct(Var1) %>% as.vector()
+
+sectors_by_years <- as.data.frame(table((china.aid$crs_sector_name), china.aid$year)) %>% filter(Freq>10)
+
+# order legend by frequency, start with only top 3 selected. 
+
+# BY MONEY not by number or projects. 
+
+# add the dimension of region not just whole world. 
+
+sectors_by_years %>% plot_ly(x = ~Var2, y = ~Freq, color = ~Var1)
+
+
+
+```
+
+# Type of Aid Flow over Time (loan, grant, etc. )
+```{r}
+
+tmp <-as.data.frame(table(china.aid$flow, china.aid$year))
+
+
+aidtype <-plot_ly(tmp) %>% add_trace(data = tmp, type = "bar", x= tmp$Var2, y= tmp$Freq, color = tmp$Var1) %>%  layout(barmode = "stack") 
+
+aidtype
+
+```
+
+
+```{r}
+
+###Further Ideas
+
+ # Make map based on not number or projects but on total money going in
+
+# Merge with Data from GDP growth of different countries and do regression analysis?
+
+```
+
+
+
+```{r}
+# calculated the subtotal sum of all money ( in USD) 2000-2014 by country. 
+
+subtotal.countries <- china.aid %>%  select(recipient_condensed, year, usd_current) %>%  arrange(recipient_condensed) %>% group_by(recipient_condensed, year) %>% mutate(sum.usd= sum(usd_current, na.rm= T)) %>% select(-usd_current) %>% unique() %>%arrange(recipient_condensed, year) %>%  group_by(recipient_condensed) %>% mutate( "Total Sum for Country"= sum(sum.usd))
+
+# the subtotal USD per sector per year
+
+subtotal.sectors <- china.aid %>%  select(crs_sector_name, year, usd_current) %>%  arrange(crs_sector_name) %>% group_by(crs_sector_name, year) %>% mutate(sum.usd= sum(usd_current, na.rm= T)) %>% select(-usd_current) %>% unique() %>%arrange(crs_sector_name, year) %>% group_by(crs_sector_name) %>% mutate( total.per.sector= sum(sum.usd)) 
+
+top.sectors <- subtotal.sectors %>%  select(-year, -sum.usd) %>%  unique() %>%  arrange(desc(total.per.sector)) %>% filter(total.per.sector > 10000000000) %>%   filter(!(crs_sector_name %in% c("Unallocated / Unspecified", "Other Multisector"))) %>%  left_join(subtotal.sectors) %>%  select(-total.per.sector)  
+
+                                                                                    bot.sectors <- subtotal.sectors %>%  select(-year, -sum.usd) %>%  unique() %>%  arrange(desc(total.per.sector)) %>% filter(total.per.sector < 10000000000 | crs_sector_name %in% c("Unallocated / Unspecified", "Other Multisector")) %>% left_join(subtotal.sectors) %>% group_by(year) %>% summarize( sum.usd = sum(sum.usd)) %>% mutate(crs_sector_name = "Other Projects")
+                                                                                    
+  full.sectors <- full_join(top.sectors, bot.sectors)                                                                                 
+ l <- list(
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2)
+ 
+ x <- list( title= "Years", nticks=20,
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2) 
+ 
+  y <- list( title= "Amount of Aid (in billions of USD)",
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2) 
+ 
+                                                                                                                 
+p <- plot_ly(full.sectors) %>%  add_trace(data = full.sectors, type = "bar", x= full.sectors$year, y= full.sectors$sum.usd, color = full.sectors$crs_sector_name) %>%  layout(barmode = "stack", legend = l, title= "Aid by Sectors", xaxis= x, yaxis= y) 
+
+p
+``` 
+
+```{r}
+
+# BAR graph to respresent change of countries over time- top 10 countries + rest. xolor= country
+
+
+subtotal.countries <- china.aid %>%  select(recipient_condensed, year, usd_current) %>%  arrange(recipient_condensed) %>% group_by(recipient_condensed, year) %>% mutate(sum.usd= sum(usd_current, na.rm= T)) %>% select(-usd_current) %>% unique() %>%arrange(recipient_condensed, year) %>%  group_by(recipient_condensed) %>% mutate( total.per.country= sum(sum.usd))
+
+top.countries <- subtotal.countries %>% select(-year, -sum.usd) %>% unique() %>% arrange(desc(total.per.country)) %>% head(15) %>% left_join(subtotal.countries) %>% select(-total.per.country) 
+
+rest.countries <- subtotal.countries %>% select(-year, -sum.usd) %>% unique() %>% arrange(desc(total.per.country)) %>% tail(148-15) %>% left_join(subtotal.countries) %>% group_by(year) %>% summarize(sum.usd = sum(sum.usd)) %>% mutate(recipient_condensed = "Other Recipients")
+
+full.countries <- full_join(top.countries, rest.countries) 
+
+p <- plot_ly(full.countries) %>%  add_trace(data = full.countries, type = "bar", x= full.countries$year, y= full.countries$sum.usd, color = full.countries$recipient_condensed) %>%  layout(barmode = "stack", legend = l, title= "Aid by Countries", xaxis= x, yaxis= y)
+
+p
+
+#just top 15 trends
+
+p <- plot_ly(top.countries) %>%  add_trace(data = top.countries, type = "bar", x= top.countries$year, y= top.countries$sum.usd, color = top.countries$recipient_condensed) %>%  layout(barmode = "stack", legend = l, title= "Aid by Countries", xaxis= x, yaxis= y)
+
+p
+
+
+```
+
+
+
+ 
+
+```{r}
+# To What types of economies does China give aid? 1. relationship of imports and exports.
+
+# bubble plot - exports vs. imports countries ( size of aid is size of bubble)
+trade.aid <- subtotal.countries %>% rename(Year=year, Partner= recipient_condensed) %>% left_join(china.trade) %>% rename(aid.2014= sum.usd) %>% filter(Year==2014) %>% na.omit %>% mutate(smaller.average =total.per.country/14/100000000)
+
+
+# exports and imports, bubble size is overall average aid received in last 14 years.
+t <- plot_ly(trade.aid, x= ~Export, y= ~Import, text=~Partner, sizes = c(0.1,1), type='scatter', mode = 'markers', marker = list(size = ~smaller.average, opacity = 0.5))
+t
+
+```
+
+```{r}
+#2. GDP/capita and amount of aid given in 2014.
+
+gdp.aid <- global.gdp %>%  filter(year==2014) %>% full_join(subtotal.countries) %>% na.omit() %>%  filter(sum.usd != 0) %>% mutate(average.aid.per.year= total.per.country/14)
+
+p14 <- plot_ly(gdp.aid, x=~GDP_USD, y= ~sum.usd, text=~recipient_condensed)
+
+p14
+p.avg <-plot_ly(gdp.aid, x=~GDP_USD, y= ~average.aid.per.year, text=~recipient_condensed)
+p.avg
+
+```
+
+```{r}
+#boxplots - 
+
+gdp.aid.bp <- global.gdp %>% full_join(subtotal.countries) %>% na.omit() %>% mutate(average.aid.per.year= total.per.country/14/1000000) %>% mutate(gdp.range= ifelse(GDP_USD<=1000,"0-1000 USD/capita",ifelse(GDP_USD>5000,"over 5000 USD/capita","1000-5000 USD/capita")))
+
+
+p10 <- ggplot(gdp.aid.bp, aes(x = gdp.range, y = average.aid.per.year)) +
+        geom_boxplot()+  ggtitle("Distribution of Chinese aid received based on GDP/capita : 2000-2014")+ theme_bw()+
+  theme(plot.title = element_text(size = 13, family = "Tahoma", face = "bold"),
+              text = element_text(size = 11, family = "Tahoma"),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(size = 10)) +
+        scale_fill_brewer(palette = "Accent")+ scale_y_continuous(name = "Average amount of aid  (millions of USDs)"
+                        ) +
+        scale_x_discrete(name = "GDP Range") 
+
+#because aid per year for each country can be variable due to projects started and so on... needs to be average aid per year sicne 2000-2014. 
+
+p10
+
+
+```

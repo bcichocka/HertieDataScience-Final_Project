@@ -1,0 +1,413 @@
+---
+title: "Final Project"
+author: "Beata Cichocka and Xiaoyue Zheng"
+date: "November 28, 2017"
+output:
+  html_document: default
+  pdf_document: default
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE, warning=FALSE, comment=NA, message= FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(plm)
+library(quanteda)
+library(tidyverse)
+library(readxl)
+library(DBI)
+library(RMySQL) 
+library(httr)
+library(jsonlite)
+library(haven)
+library(RColorBrewer)
+library(readxl)
+library(rworldmap)
+library(maps)
+library(plotly)
+library(dplyr)
+
+## Tidying Chinese Aid Data: 2000-2014
+getwd()
+china.aid <- read_excel("~/HertieDataScience/Final_Project/ChinaAid.xlsx")
+
+## Tidying GDP Growth Data: GDP per Capita in USD: 2000-2014
+
+global.gdp <- read.csv(file = "~/HertieDataScience/Final_Project/GDPdata.csv", header = TRUE, sep = ",") %>%  filter(Year %in% c(2000:2014)) %>% select(-Item) %>%  arrange(Country.or.Area, Year) %>% rename(GDP_USD = Value) %>%  mutate(Growth_Rate= log10(GDP_USD)) %>% rename(year= Year, recipient_condensed = Country.or.Area)
+
+
+#Joining gdp and aid data
+
+joined <- full_join(china.aid, global.gdp)
+
+## Tidying Trade Data: China's exports and imports by country, 2000-2014
+
+trade1 <- read.csv(file="~/HertieDataScience/Final_Project/comtrade2000_2004.csv")
+trade2 <- read.csv(file="~/HertieDataScience/Final_Project/comtrade2005_2009.csv")
+trade3 <- read.csv(file="~/HertieDataScience/Final_Project/comtrade2010_2014.csv")
+tmp <- full_join(trade1, trade2)
+
+china.trade <- full_join(tmp, trade3) %>%  select(Year, Partner, Trade.Flow, Trade.Value..US..) %>%  arrange(Partner, Year) %>%  spread(Trade.Flow, Trade.Value..US..)%>% mutate_all(funs(replace(., is.na(.), 0)))
+
+```
+#Introduction
+Chinese aid has recently become a topic of hot debate among academia and the public, with many doubting its economic and political motives. Nevertheless, it is clear that Chinese aid is on the rise with new Chinese-led development banks and the famous "Belt and Road Initiaitve" which plans to connect countries of the global South in China's periphery through transport and infrastructure investment. China has deepened its financial engagement with the world, and its foreign aid totals have grown at an average rate of 21.8 percent annually.
+
+China has been accused of being a rogue donor, with much of its aid provided as loans rather than grants, inappropriate impact assessments and political motivations, such as to get rid of overcapacity in the industrial sector at home. Let's look at a word cloud made from short descriptions of 5466 Chinese aid projects since 2000:
+
+
+##Sources
+
+The main dataset for this study, acquired from AidData, shows that Beijing committed $354.3 billion in official finance to 140 countries between 2000 and 2014. Further, data from Comtrade and the World Bank were used to describe trade patterns between China and developing countries, and the GDP growth and GDP per capita of countries to which China provides aid. These datasets were then cleaned and merged with data on bilateral trade between China and its aid subjects to see the influence of trade on aid patterns, and further
+
+## Wordcloud of Descriptions of Chinese Aid
+
+```{r, echo=FALSE, warning=FALSE, message= FALSE}
+commonwords <- c("china", "Chinese", "china's", "project",
+                 "signed","agreement",
+                 "million", "billion", "one", "two", "worth","used",
+                 "also", "years", "year", "month", 
+                 stopwords("english"), month.name)
+
+myDfm <- quanteda::dfm(corpus(china.aid, text_field = "description"),
+                       remove = commonwords,
+                       remove_punct = TRUE,  
+                       remove_numbers =TRUE
+                       ) 
+
+wordcloud <- quanteda::textplot_wordcloud(myDfm,
+                             min.freq = 500,
+                             random.order = FALSE, 
+                             rot.per = .25, 
+                             colors = RColorBrewer::brewer.pal(8,"Dark2")) 
+wordcloud
+``` 
+Clearly the words construction and loan feature prominently, but alongside words such as medical, donated, and grant. Now let's perform a more rigorous analysis of Chinese aid. 
+
+
+## Map of Recipient Countries by Amount of Projects 2000-2014
+This map shows a geographical distribution of Chinese projects across the world. China has a very broad aid portfolio, providing assistance practically everywhere apart from Western Europe and North America. However, China was most active in Pakistan and East and South-Saharan Africa. 
+```{r, warning=FALSE, echo=FALSE, comment=NA}
+
+countries.data <- as.data.frame(table(china.aid$recipient_condensed))
+
+matched <- joinCountryData2Map(countries.data, joinCode="NAME", nameJoinColumn="Var1", verbose=FALSE)
+
+mapCountryData(matched, nameColumnToPlot="Freq", mapTitle="Total Number of Projects, 2000-2014",catMethod = "pretty", colourPalette = "heat")
+
+```
+
+
+# Type of Aid Flow over Time
+
+Chinese aid has been criticised as well as praised for its different modalities. China uses leveraged finance rather than traditional modes of Official Development Assistance approved by the OECD. There are specific risks with providing loans rather than grants in ODA. 
+```{r, echo=FALSE, warning=FALSE, message= FALSE}
+
+tmp <-as.data.frame(table(china.aid$flow, china.aid$year))
+
+                                               
+ l <- list( title= "Aid Modality",
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2)
+ 
+ x <- list( title= "Year", nticks=20,
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2) 
+ 
+  
+  y <- list( title= "Amount of Projects",
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2) 
+ 
+
+aidtype <-plot_ly(tmp) %>% add_trace(data = tmp, type = "bar", x= tmp$Var2, y= tmp$Freq, color = tmp$Var1) %>%  layout(barmode = "stack", legend = l, title= "Number of Projects by Aid Modality(2000-2014)", xaxis= x, yaxis= y) 
+
+aidtype
+
+```
+We can however see that Chinese aid features a majority of grants, strongly supported by loans. A small but growing portion of the aid modality includes provision of scholarships and raising of human capital in developing countries. 
+
+#Sectors over Time
+
+China is very strong in industrial capacity, therefore it is natural that its development aims abroad would also include many infrastructure, communications, and energy projects. A significant insreade is Transport in 2014 can be interpreted as preparation for the "Belt and Road Initiative" by Xi Jinping, which aims to boost connectivity worldwide. We can also see that the share of industry and mining projects has been declining since a high in 2010. To explore further, please use this interactive plot by double clicking on your selected sectors to see how they evolve over time. Projects which are multisectoral or which are in smaller areas have been grouped together in the "Other Projects" category.
+
+```{r, echo=FALSE, warning=FALSE, message= FALSE} 
+
+
+# calculated the subtotal USD per sector per year
+
+subtotal.sectors <- china.aid %>%  select(crs_sector_name, year, usd_current) %>%  arrange(crs_sector_name) %>% group_by(crs_sector_name, year) %>% mutate(sum.usd= sum(usd_current, na.rm= T)) %>% select(-usd_current) %>% unique() %>%arrange(crs_sector_name, year) %>% group_by(crs_sector_name) %>% mutate( total.per.sector= sum(sum.usd)) 
+
+# to prevent havign too many categories, created an "other projects" category to include minor areas or multisector projects
+top.sectors <- subtotal.sectors %>%  select(-year, -sum.usd) %>%  unique() %>%  arrange(desc(total.per.sector)) %>% filter(total.per.sector > 10000000000) %>%   filter(!(crs_sector_name %in% c("Unallocated / Unspecified", "Other Multisector"))) %>%  left_join(subtotal.sectors) %>%  select(-total.per.sector)  
+                                                                                    bot.sectors <- subtotal.sectors %>%  select(-year, -sum.usd) %>%  unique() %>%  arrange(desc(total.per.sector)) %>% filter(total.per.sector < 10000000000 | crs_sector_name %in% c("Unallocated / Unspecified", "Other Multisector")) %>% left_join(subtotal.sectors) %>% group_by(year) %>% summarize( sum.usd = sum(sum.usd)) %>% mutate(crs_sector_name = "Other Projects")
+                                                                                    
+  full.sectors <- full_join(top.sectors, bot.sectors)                                                                                 
+ l <- list(
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2)
+ 
+ x <- list( title= "Years", nticks=20,
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2) 
+ 
+  y <- list( title= "Amount of Aid (in billions of USD)",
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2) 
+ 
+                                                                                                            
+p <- plot_ly(full.sectors) %>%  add_trace(data = full.sectors, type = "bar", x= full.sectors$year, y= full.sectors$sum.usd, color = full.sectors$crs_sector_name) %>%  layout(barmode = "stack", legend = l, title= "Aid by Sectors", xaxis= x, yaxis= y) 
+
+p
+``` 
+
+# Aid-Receiving Countries: Who gets how much?
+```{r, echo=FALSE, warning=FALSE, message= FALSE}
+
+
+# calculated the subtotal sum of all money (in USD) per year by country. 
+
+subtotal.countries <- china.aid %>%  select(recipient_condensed, year, usd_current) %>%  arrange(recipient_condensed) %>% group_by(recipient_condensed, year) %>% mutate(sum.usd= sum(usd_current, na.rm= T)) %>% select(-usd_current) %>% unique() %>%arrange(recipient_condensed, year) %>%  group_by(recipient_condensed) %>% mutate( total.per.country= sum(sum.usd))
+
+top.countries <- subtotal.countries %>% select(-year, -sum.usd) %>% unique() %>% arrange(desc(total.per.country)) %>% head(15) %>% left_join(subtotal.countries) %>% select(-total.per.country) 
+
+rest.countries <- subtotal.countries %>% select(-year, -sum.usd) %>% unique() %>% arrange(desc(total.per.country)) %>% tail(148-15) %>% left_join(subtotal.countries) %>% group_by(year) %>% summarize(sum.usd = sum(sum.usd)) %>% mutate(recipient_condensed = "Other Recipients")
+
+full.countries <- full_join(top.countries, rest.countries) 
+
+p1 <- plot_ly(full.countries) %>%  add_trace(data = full.countries, type = "bar", x= full.countries$year, y= full.countries$sum.usd, color = full.countries$recipient_condensed) %>%  layout(barmode = "stack", legend = l, title= "Aid by Countries", xaxis= x, yaxis= y)
+
+p1
+
+
+```
+
+We can see that among the top 15 countries specifically listed on this graph, 4 continents are covered: Europe, Africa, Asia, and South America. While the overall trend of aid inflows follows a pattern of growth (and a significant and belated bust during the Global Financial Crisis, followed by a rebound), the country-by-country descriptions are not as clear. This might be because certain projects, which in reality last many years, get funded only during one year, leading to distortions to the bigger picture. Thus, it is crucial to focus not just on trade received per year, but average amount of trade received over 14 years per country. 
+
+##Volume of Aid based on Exports and Imports (2000-2014)
+
+A big controversy surrounding Chinese aid is the idea that it is conditional on cheap trade of raw materials or energy from resource-rich countries. Is there credibility to this view? How do exports and imports correlate with the volume of aid China gives to specific countries: either as rewards or incentives for preferential trade?
+```{r, echo=FALSE, warning=FALSE, message= FALSE}
+# To What types of economies does China give aid? 1. relationship of imports and exports.
+
+# bubble plot - exports vs. imports countries ( size of aid is size of bubble)
+trade.aid <- subtotal.countries %>% rename(Year=year, Partner= recipient_condensed) %>% left_join(china.trade) %>% rename(aid.2014= sum.usd) %>% filter(Year==2014) %>% na.omit %>% mutate(smaller.average =total.per.country/14/50000000)
+
+ 
+ x <- list( title= "Value of Chinese Exports Received (billions of USD)", nticks=20,
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2) 
+ 
+  y <- list( title= "Value of Imports by China (billions of USD)",
+  font = list(
+    family = "sans-serif",
+    size = 12,
+    color = "#000"),
+  bgcolor = "#E2E2E2",
+  bordercolor = "#FFFFFF",
+  borderwidth = 2) 
+
+t <- plot_ly(trade.aid, x= ~Export, y= ~Import,text=(~Partner), sizes = c(0.1,1), type='scatter', mode = 'markers', marker = list(size = ~smaller.average, opacity = 0.5)) %>%  
+               layout(title = 'Amount of Aid Received based on Exports and Imports with China',
+         xaxis = x,
+         yaxis = y)
+
+t
+
+```
+
+There seems to be no clear correlation between greater amount of exports received and more aid beign given. However, if you zoom in to the smaller values on both the x and y axis, it is evident that China does have specific target countries with much larger volumes of aid, regardless of volumes of trade. These countries may be chosen for external reasons, such as politics, geographical location, or path dependencies. 
+
+A potential motivation for country selection is the GDP level of a country. Common sense dictates that the poorest countries should receive the most aid volume in normative terms. How does this look in reality?
+
+##Boxplots: Distribution of Chinese Aid by GDP/capita
+```{r, echo=FALSE, warning=FALSE, message= FALSE}
+ 
+
+gdp.aid.bp <- global.gdp %>% full_join(subtotal.countries) %>% na.omit() %>% mutate(average.aid.per.year= total.per.country/14/1000000) %>% mutate(gdp.range= ifelse(GDP_USD<=1000,"0-1000 USD/capita",ifelse(GDP_USD>5000,"over 5000 USD/capita","1000-5000 USD/capita")))
+
+
+p10 <- ggplot(gdp.aid.bp, aes(x = gdp.range, y = average.aid.per.year)) +
+        geom_boxplot()+  ggtitle("Distribution of Chinese aid received based on GDP/capita : 2000-2014")+ theme_bw()+
+  theme(plot.title = element_text(size = 13,  face = "bold"),
+              text = element_text(size = 11),
+              axis.title = element_text(face="bold"),
+              axis.text.x=element_text(size = 10)) +
+         scale_y_continuous(name = "Average amount of aid  (millions of USDs)"
+                        ) +
+        scale_x_discrete(name = "GDP Range") 
+
+#because aid per year for each country can be variable due to projects started and so on... needs to be average aid per year sicne 2000-2014. 
+
+p10
+
+```
+In reality, it is not the poorest nations that receive aid from China, but those who are in the bracket of 1000-5000 USD/ capita GDP, which are still economically underdeveloped. This may be due to factors such as civil wars and institutional inability to handle aid in the poorest nations. Another explanation is the fact that countries which are already in the higher GDP bracket have already prepared for industrial take-off in their stage of development, and may thus need additional capital to develop their industries and infrastructure. However, the boxplots also demonstrate that the mean investment per country is equal in all three categories. 
+
+# Statistic Analysis
+
+## Hypothesis
+After we made some brief discriptive explorations of this dataset and compared it with data on donee's GDP and trade patterns, there still remain some questions:
+1. Why would China provide financial aid to these countries? Is there any benefit for Chinese government directly from the aid? 
+2. What is the impact of the financial aid on developing countries? 
+
+For the first question, we assume that the financial aid would promote the trade between China and the recipient country due to the close relationship between these two countries. Especially, due to the agreement of certain projects, China provides financial aid through exporting labor and raw materials. Therefore, we hypothesise that financial aid would promote trade volume in a causal relationship, especially regarding exports.
+
+Meanwhile, we would also expect such financial aid would benefit recipient countries. For this hypothesis, the most available data we can get is the annual GDP amount. Therefore, we chose annual GDP as our dependent variable for a deeper statistical analysis.
+
+## Methodology
+The calculation of GDP composes various aspects of a country's economy. In other words, GDP growth could be influenced by other factors such as the inflow of foreign investment, technology improvements and so on. Apart from that, demographic characteristics including the education level, structure of age groups also have impacts on economic growth. As a result, we apply a fixed effect model here to wipe out endogenous factors that would affect the economic growth. Meanwhile, we use the form of log to see the GDP growth rate change.
+
+Apart from that, due to the procedures and regulations, the implementation of certain financial aid would take some time to make a difference. On the other hand, Chinese government launched a few projects after the proposal of "The Belt and Road Initiative" in 2014. Therefore, we choose 3 as our primary lag period.
+
+```{r}
+# Merging dataframe
+arrange(china.trade, Partner)
+china.trade %>% 
+  arrange(Partner, Year) %>% 
+  rename(year = Year, recipient_condensed = Partner)
+model <- full_join(joined, china.trade, by = c("recipient_condensed" = "Partner", "year" = "Year"))
+#apply(model, 2, sum)
+
+# Select related data for further regression
+model1 <- model[, c(8,4,18, 55, 57, 58)]
+model1 %>% 
+  arrange(model1, recipient_condensed, year)
+model1 %>% 
+  arrange(model1, recipient_condensed, year)
+tapply(model1$usd_current, list(model1$recipient_condensed, model1$year), sum)
+
+# Calculate annual financial aid by recipients
+arrange(model1, recipient_condensed)
+total <- tapply(model1$usd_current, list(model1$recipient_condensed, model1$year), sum, na.rm = T)
+
+
+total.country <- unique(model1$recipient_condensed) %>% 
+  sort()
+total.country <- data.frame(recipient_condensed = total.country)
+
+total.aid <- cbind(total.country, total)
+colnames(total.aid)[1] <- "recipient_condensed"
+
+# Create a list of financial aid recipient countries to filter out irrelavant countries in the dataset
+recipient <- unique(china.aid$recipient_condensed) %>% 
+  sort()
+recipient <- data.frame(recipient = recipient)
+colnames(recipient)[1] <- "recipients"
+
+
+model2 <- inner_join(total.aid, recipient, by = c("recipient_condensed" = "recipients"))
+
+modeltidy <- model2 %>% tidyr::gather(key = year, value = annual, -recipient_condensed)
+modeltidy$year <-  as.integer(as.character(modeltidy$year))
+model4 <- inner_join(global.gdp, recipient, by = c("recipient_condensed" = "recipients"))
+model4 <- model4[, c(1,2,3,4)]
+model5 <- inner_join(china.trade, recipient, by = c("Partner" = "recipients"))
+model5 <- model5[,c(1,2,3,4)]
+model6 <- full_join(model4,model5, by = c("recipient_condensed" = "Partner", "year" = "Year"))
+modelfinal <- full_join(modeltidy, model6, by = c("recipient_condensed" = "recipient_condensed", "year" = "year"))
+
+```
+
+
+```{r}
+# Statistics Analysis: relationship between GDP growth & financial aid
+library(plm)
+G <- pdata.frame(modelfinal, index=c("recipient_condensed"), drop.index = T, row.names = T)
+lgro <- plm(Growth_Rate~annual|lag(annual, 3), data = G, mode = "within")
+summary(lgro)
+summary(fixef(lgro, type = "dmean"))
+```
+
+
+## Hypothesis1: Financial aid would promote economic growth.
+Based on small R-squared and high p-value, the regression model based on this hyphthesis is not reliable.
+
+```{r}
+# Statistics Analysis: relationship between GDP growth & financial aid with lag=2
+G <- pdata.frame(modelfinal, index=c("recipient_condensed"), drop.index = T, row.names = T)
+lgro2 <- plm(Growth_Rate~annual|lag(annual, 2), data = G, mode = "within")
+summary(lgro2)
+summary(fixef(lgro2, type = "dmean"))
+```
+However, when we reduce the number of the lag function, the results become more revealing. The positive coefficient of financial aid shows a positive relationship between financial aid and economic growth. Overall p-value for the whole model increased. Specifically, p-value for certain countries are statistically significant, including Australia, Kuwait, United Arab Emirates.
+
+```{r}
+# Statistics Analysis: relationship between GDP growth & financial aid with lag=1
+G <- pdata.frame(modelfinal, index=c("recipient_condensed"), drop.index = T, row.names = T)
+lgro1 <- plm(Growth_Rate~annual|lag(annual, 1), data = G, mode = "within")
+summary(lgro1)
+summary(fixef(lgro1, type = "dmean"))
+```
+As the number of lag function decrease, while overall impact of financial aid remains the same, the significant effect for certain countries is alleviated. 
+
+## Hypothesis2: Financial aid would influence trade volumns between China and recipient countries.
+```{r}
+# Statistics Analysis: relationship between trade and financial growth
+imgro <- plm(Import~annual|lag(annual, 3), data = G, mode = "within")
+summary(imgro)
+summary(fixef(imgro, type = "dmean"))
+```
+Compared to the relationship between economic growth and financial trade, the increases in imports from recipient countries are more significantly, especially for Austrailia, Malaysia, Singapore, and Thailand. It also suggests a positive relationship. 
+
+Similar to the test of GDP growth, we also reduced the number of lag and found results remained almost the same.
+
+```{r}
+# Statistics Analysis: relationship between trade and financial growth
+imgro2 <- plm(Import~annual|lag(annual, 2), data = G, mode = "within")
+summary(imgro2)
+summary(fixef(imgro, type = "dmean"))
+```
+
+
+```{r}
+# Regrssion: exports & financial aid
+exgro <- plm(Export~annual|lag(annual, 3), data = G, mode = "within")
+summary(exgro)
+
+```
+
+# Conclusion
+
+The regression model suggested a positive relationship between financial aid with either economic growth or trade volume. At the same time, we find that the impact of projects decreased as time passed.
+
+ Many issues in China's aid patterns remain to be explored, and many will involve both quantitative and qualitative issues in the future. 
+
+
+
+
+

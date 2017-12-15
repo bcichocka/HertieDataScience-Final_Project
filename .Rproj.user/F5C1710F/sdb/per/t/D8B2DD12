@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1513340176762.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "D8B2DD12",
+    "lastKnownWriteTime" : 0,
+    "last_content_update" : -2147483648,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "B6F89072",
+        "caption" : "subtotal.countries",
+        "contentUrl" : "grid_resource/gridviewer.html?env=_rs_no_env&obj=subtotal.countries&cache_key=B6F89072",
+        "displayedObservations" : "1448",
+        "environment" : "_rs_no_env",
+        "object" : "subtotal.countries",
+        "preview" : "0",
+        "totalObservations" : "1448",
+        "variables" : "4"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

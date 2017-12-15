@@ -1,0 +1,17 @@
+"0","countries.data <- as.data.frame(table(china.aid$recipient_condensed))"
+"0","matched <- joinCountryData2Map(countries.data, joinCode=""NAME"", nameJoinColumn=""Var1"", verbose=FALSE)"
+"1","137"
+"1"," "
+"1","codes from your data successfully matched countries in the map
+"
+"1","11"
+"1"," "
+"1","codes from your data failed to match with a country code in the map
+"
+"1","106"
+"1"," "
+"1","codes from the map weren't represented in your data
+"
+"0","mapCountryData(matched, nameColumnToPlot=""Freq"", mapTitle=""Number of Projects"",catMethod = ""pretty"", colourPalette = ""heat"")"
+"2","You asked for 7 categories, 10 were used due to pretty() classification
+"

@@ -1,0 +1,9 @@
+"0","tmp <-as.data.frame(table(china.aid$flow, china.aid$year))"
+"0","aidtype <-plot_ly(tmp) %>% add_trace(data = tmp, type = ""bar"", x= tmp$Var2, y= tmp$Freq, color = tmp$Var1) %>%  layout(barmode = ""stack"") "
+"0","aidtype"
+"2","n too large, allowed maximum for palette Set2 is 8
+Returning the palette you asked for with that many colors
+"
+"2","n too large, allowed maximum for palette Set2 is 8
+Returning the palette you asked for with that many colors
+"

@@ -1,0 +1,20 @@
+"0","selected_sectors<- as.data.frame(table(china.aid$crs_sector_name)) %>% filter(Freq >100) %>% distinct(Var1) %>% as.vector()"
+"0","sectors_by_years <- as.data.frame(table((china.aid$crs_sector_name), china.aid$year)) %>% filter(Freq>10)"
+"0","# order legend by frequency, start with only top 3 selected. "
+"0","# BY MONEY not by number or projects. "
+"0","# add the dimension of region not just whole world. "
+"0","sectors_by_years %>% plot_ly(x = ~Var2, y = ~Freq, color = ~Var1)"
+"2","No trace type specified:
+  Based on info supplied, a 'bar' trace seems appropriate.
+  Read more about this trace type -> https://plot.ly/r/reference/#bar
+"
+"2","n too large, allowed maximum for palette Set2 is 8
+Returning the palette you asked for with that many colors
+"
+"2","No trace type specified:
+  Based on info supplied, a 'bar' trace seems appropriate.
+  Read more about this trace type -> https://plot.ly/r/reference/#bar
+"
+"2","n too large, allowed maximum for palette Set2 is 8
+Returning the palette you asked for with that many colors
+"

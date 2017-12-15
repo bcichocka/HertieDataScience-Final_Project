@@ -1,0 +1,113 @@
+"0","knitr::opts_chunk$set(echo = FALSE)"
+"2","Warning messages:
+"
+"2","1: package â€˜quantedaâ€™ was built under R version 3.4.2 
+"
+"2","2: package â€˜spâ€™ was built under R version 3.4.2 
+"
+"0","library(quanteda)"
+"0","library(tidyverse)"
+"2","package ‘tidyverse’ was built under R version 3.4.2"
+"2","Loading tidyverse: ggplot2
+Loading tidyverse: tibble
+Loading tidyverse: tidyr
+Loading tidyverse: readr
+Loading tidyverse: purrr
+Loading tidyverse: dplyr
+"
+"2","Conflicts with tidy packages ----------------------------------------------------
+"
+"2","filter(): dplyr, stats
+lag():    dplyr, stats
+"
+"0","library(readxl)"
+"0","library(DBI)"
+"2","package ‘DBI’ was built under R version 3.4.2"
+"0","library(RMySQL) "
+"2","package ‘RMySQL’ was built under R version 3.4.2"
+"0","library(httr)"
+"2","package ‘httr’ was built under R version 3.4.2"
+"0","library(jsonlite)"
+"2","
+Attaching package: ‘jsonlite’
+
+"
+"2","The following object is masked from ‘package:purrr’:
+
+    flatten
+
+"
+"0","library(haven)"
+"0","library(RColorBrewer)"
+"0","library(readxl)"
+"0","library(rworldmap)"
+"2","package ‘rworldmap’ was built under R version 3.4.2"
+"2","### Welcome to rworldmap ###
+"
+"2","For a short introduction type : 	 vignette('rworldmap')
+"
+"0","library(maps)"
+"2","package ‘maps’ was built under R version 3.4.2"
+"2","
+Attaching package: ‘maps’
+
+"
+"2","The following object is masked from ‘package:purrr’:
+
+    map
+
+"
+"0","library(plotly)"
+"2","package ‘plotly’ was built under R version 3.4.2"
+"2","
+Attaching package: ‘plotly’
+
+"
+"2","The following object is masked from ‘package:httr’:
+
+    config
+
+"
+"2","The following object is masked from ‘package:ggplot2’:
+
+    last_plot
+
+"
+"2","The following object is masked from ‘package:stats’:
+
+    filter
+
+"
+"2","The following object is masked from ‘package:graphics’:
+
+    layout
+
+"
+"0","library(dplyr)"
+"0","## Tidying Chinese Aid Data: 2000-2014"
+"0","china.aid <- read_excel(""~/HertieDataScience/Final_Project/ChinaAid.xlsx"")"
+"0","## Tidying GDP Growth Data: GDP per Capita in USD: 2000-2014"
+"0","global.gdp <- read.csv(file = ""~/HertieDataScience/Final_Project/GDPdata.csv"", header = TRUE, sep = "","") %>%  filter(Year %in% c(2000:2014)) %>% select(-Item) %>%  arrange(Country.or.Area, Year) %>% rename(GDP_USD = Value) %>%  mutate(Growth_Rate= log10(GDP_USD)) %>% rename(year= Year, recipient_condensed = Country.or.Area)"
+"0","#joining gdp and aid"
+"0","joined <- full_join(china.aid, global.gdp)"
+"2","Joining, by = c(""year"", ""recipient_condensed"")
+"
+"2","Column `recipient_condensed` joining character vector and factor, coercing into character vector"
+"0","## Tidying Trade Data: China's exports and imports by country, 2000-2014"
+"0","trade1 <- read.csv(file=""~/HertieDataScience/Final_Project/comtrade2000_2004.csv"")"
+"0","trade2 <- read.csv(file=""~/HertieDataScience/Final_Project/comtrade2005_2009.csv"")"
+"0","trade3 <- read.csv(file=""~/HertieDataScience/Final_Project/comtrade2010_2014.csv"")"
+"0","tmp <- full_join(trade1, trade2)"
+"2","Joining, by = c(""Classification"", ""Year"", ""Period"", ""Period.Desc."", ""Aggregate.Level"", ""Is.Leaf.Code"", ""Trade.Flow.Code"", ""Trade.Flow"", ""Reporter.Code"", ""Reporter"", ""Reporter.ISO"", ""Partner.Code"", ""Partner"", ""Partner.ISO"", ""X2nd.Partner.Code"", ""X2nd.Partner"", ""X2nd.Partner.ISO"", ""Customs.Proc..Code"", ""Customs"", ""Mode.of.Transport.Code"", ""Mode.of.Transport"", ""Commodity.Code"", ""Commodity"", ""Qty.Unit.Code"", ""Qty.Unit"", ""Qty"", ""Alt.Qty.Unit.Code"", ""Alt.Qty.Unit"", ""Alt.Qty"", ""Netweight..kg."", ""Gross.weight..kg."", ""Trade.Value..US.."", ""CIF.Trade.Value..US.."", ""FOB.Trade.Value..US.."", ""Flag"")
+"
+"2","Column `Classification` joining factors with different levels, coercing to character vector"
+"2","Column `Partner` joining factors with different levels, coercing to character vector"
+"2","Column `Partner.ISO` joining factors with different levels, coercing to character vector"
+"2","Column `Commodity` joining factors with different levels, coercing to character vector"
+"0","china.trade <- full_join(tmp, trade3) %>%  select(Year, Partner, Trade.Flow, Trade.Value..US..) %>%  arrange(Partner, Year) %>%  spread(Trade.Flow, Trade.Value..US..) "
+"2","Joining, by = c(""Classification"", ""Year"", ""Period"", ""Period.Desc."", ""Aggregate.Level"", ""Is.Leaf.Code"", ""Trade.Flow.Code"", ""Trade.Flow"", ""Reporter.Code"", ""Reporter"", ""Reporter.ISO"", ""Partner.Code"", ""Partner"", ""Partner.ISO"", ""X2nd.Partner.Code"", ""X2nd.Partner"", ""X2nd.Partner.ISO"", ""Customs.Proc..Code"", ""Customs"", ""Mode.of.Transport.Code"", ""Mode.of.Transport"", ""Commodity.Code"", ""Commodity"", ""Qty.Unit.Code"", ""Qty.Unit"", ""Qty"", ""Alt.Qty.Unit.Code"", ""Alt.Qty.Unit"", ""Alt.Qty"", ""Netweight..kg."", ""Gross.weight..kg."", ""Trade.Value..US.."", ""CIF.Trade.Value..US.."", ""FOB.Trade.Value..US.."", ""Flag"")
+"
+"2","Column `Classification` joining character vector and factor, coercing into character vector"
+"2","Column `Partner` joining character vector and factor, coercing into character vector"
+"2","Column `Partner.ISO` joining character vector and factor, coercing into character vector"
+"2","Column `Commodity` joining character vector and factor, coercing into character vector"
